@@ -1,23 +1,30 @@
 # vcnt - Discord Voice Logger Bot
 
-A lightweight Discord bot that logs voice channel join, leave, and move events to a designated text channel (or direct messages). Built with Python and discord.py, and deployed on a Proxmox home server with systemd for 24/7 availability.
+A lightweight Discord bot that logs voice channel join, leave, and move events, and provides a simple `/coin` slash command for a coin flip. Built with Python and discord.py, and deployed on a Proxmox home server with systemd for 24/7 availability.
 
 ---
 
 ## Features
 
-* Logs when users join, leave, or switch voice channels.
-* Sends formatted messages to a specified Discord text channel.
-* Configurable via environment variables (`.env`).
-* Runs continuously under systemd on a Proxmox VM or container.
+* **Voice State Logging**: Logs when users join, leave, or switch voice channels.
+* **Slash Command**: `/coin` flips a coin and returns **Heads** or **Tails**.
+* **Configurable** via environment variables in a `.env` file.
+* **Systemd Service**: Runs continuously under systemd on a Proxmox VM or container.
 
 ---
 
 ## Prerequisites
 
-* Discord bot application with **Voice State Intent** (and optional **Server Members Intent** and **Message Content Intent**).
-* Proxmox VE with a Debian or Ubuntu VM/LXC (1–2 GB RAM, internet access).
-* Host machine or VM with internet access for Discord API (port 443).
+* A Discord Developer Application with the following enabled under **Privileged Gateway Intents**:
+
+  * **Voice State Intent** (required for voice logging)
+  * **Server Members Intent** (optional)
+  * **Message Content Intent** (optional)
+* **OAuth2 Scopes**:
+
+  * `bot`, `applications.commands` (for slash commands)
+* A Proxmox VE host with a Debian or Ubuntu VM/LXC (1–2 GB RAM, internet access).
+* Python 3.10+ installed on the host.
 
 ---
 
@@ -25,17 +32,17 @@ A lightweight Discord bot that logs voice channel join, leave, and move events t
 
 ```
 vcnt/                  # Project root
-├── bot.py             # Main bot code
+├── bot.py             # Main bot code (voice logging + slash commands)
 ├── requirements.txt   # Python dependencies
 ├── .gitignore         # Ignored files & folders
-└── README.md          # This file
+└── README.md          # This documentation
 ```
 
 ---
 
 ## Installation
 
-1. **Clone the repository** on your local machine:
+1. **Clone the repository**:
 
    ```bash
    git clone https://github.com/<YourUsername>/vcnt.git
@@ -54,55 +61,55 @@ vcnt/                  # Project root
 
 ## Configuration
 
-Create a `.env` file in the project root (never commit this to Git):
+Create a `.env` file in the project root (do not commit to Git):
 
-```env
+```dotenv
 DISCORD_TOKEN=<YOUR_BOT_TOKEN>
 LOG_CHANNEL_ID=<TEXT_CHANNEL_ID>
+APPLICATION_ID=<YOUR_APPLICATION_ID>
+GUILD_ID=<YOUR_TEST_GUILD_ID>
 ```
 
 * **DISCORD\_TOKEN**: Your bot’s token (rotate if exposed).
-* **LOG\_CHANNEL\_ID**: The ID of the text channel where events will be logged.
+* **LOG\_CHANNEL\_ID**: ID of the channel to log voice events.
+* **APPLICATION\_ID**: Your App’s Client ID (from Developer Portal).
+* **GUILD\_ID**: (For testing) your server’s ID to register slash commands instantly.
 
-Load them in `bot.py` via `python-dotenv`:
-
-```python
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
-BOT_TOKEN = os.getenv("DISCORD_TOKEN")
-LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID"))
-```
+Slash commands require the `applications.commands` scope and proper OAuth2 invite.
 
 ---
 
 ## Running Locally
 
-Start the bot for testing on your PC:
+1. **Activate** the virtual environment:
 
-```bash
-source venv/bin/activate
-python bot.py
-```
+   ```bash
+   source venv/bin/activate
+   ```
+2. **Start** the bot:
 
-Join/leave voice channels in your test server to verify logs.
+   ```bash
+   python bot.py
+   ```
+3. In your test server:
+
+   * Type `/coin` to flip a coin immediately.
+   * Join/leave voice channels to see log messages sent to the configured channel.
 
 ---
 
 ## Deployment on Proxmox
 
-1. **Create a VM or LXC** (Debian/Ubuntu) via Proxmox GUI.
+1. **Create** a Debian/Ubuntu VM or LXC in Proxmox.
 2. **SSH into the guest**:
 
    ```bash
    ssh root@<VM_IP>
    ```
-3. **Install system packages**:
+3. **Install prerequisites**:
 
    ```bash
-   apt update
-   apt install -y python3 python3-venv python3-pip git
+   apt update && apt install -y python3 python3-venv python3-pip git
    ```
 4. **Clone and set up**:
 
@@ -114,21 +121,14 @@ Join/leave voice channels in your test server to verify logs.
    source venv/bin/activate
    pip install --upgrade pip
    pip install -r requirements.txt
+   deactivate
    ```
-5. **Create the `.env`** under `/opt/vcnt`:
-
-   ```bash
-   cat > .env <<EOF
-   DISCORD_TOKEN=<YOUR_BOT_TOKEN>
-   LOG_CHANNEL_ID=<TEXT_CHANNEL_ID>
-   EOF
-   chmod 600 .env
-   ```
-6. **Set up systemd service** `/etc/systemd/system/vcnt.service`:
+5. **Create the `.env`** under `/opt/vcnt` (same entries as above) and `chmod 600 .env`.
+6. **Create a systemd service** at `/etc/systemd/system/vcnt.service`:
 
    ```ini
    [Unit]
-   Description=vcnt Discord Voice Logger Bot
+   Description=vcnt Discord Bot (Voice Logger + /coin)
    After=network.target
 
    [Service]
@@ -149,11 +149,6 @@ Join/leave voice channels in your test server to verify logs.
    systemctl daemon-reload
    systemctl enable vcnt
    systemctl start vcnt
-   ```
-8. **Verify logs**:
-
-   ```bash
-   systemctl status vcnt
    journalctl -u vcnt -f
    ```
 
@@ -161,26 +156,20 @@ Join/leave voice channels in your test server to verify logs.
 
 ## Updating the Bot
 
-Whenever you push changes to GitHub:
+After making changes and pushing to GitHub:
 
 ```bash
 ssh root@<VM_IP>
 cd /opt/vcnt
-git pull
+git pull origin main
 source venv/bin/activate
-pip install -r requirements.txt  # if new dependencies
+pip install -r requirements.txt  # if new deps
 systemctl restart vcnt
 journalctl -u vcnt -f
 ```
 
 ---
 
-## Contributing
-
-Contributions are welcome! Please open an issue or submit a pull request.
-
----
-
 ## License
 
-This project is released under the MIT License.
+MIT License. Feel free to use and modify!
